@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "dependencies": {
+    "axios": "^0.27.2",
+    "jimp": "^0.16.1",
+    "nodemon": "^2.0.16"
+  }
+}
