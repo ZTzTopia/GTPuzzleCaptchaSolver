@@ -211,8 +211,8 @@ class PuzzleCaptchaSolver {
             score = 0;
             for (let j = 0; j < this.check.length; j++) {
                 let address = ((y + this.check[j].y) * this.rttex.width) + (x + this.check[j].x);
-                let expct = (this.check[j].expect == 255) ? 0 : 1;
-                if (this.pixelsFiltered[address] == expct) {
+                let expect = (this.check[j].expect == 255) ? 0 : 1;
+                if (this.pixelsFiltered[address] == expect) {
                     score++;
                 }
             }
@@ -238,50 +238,57 @@ async function main() {
         }
     });
 
-    http.createServer(async (req, res) => {
-        let apiResponse = "failed";
-        if (req.url.startsWith("/api")) {
-            const queryObject = url.parse(req.url, true).query;
-            if (queryObject.type == "puzzlecaptchasolver" && typeof queryObject.uuid == "string") {
-                if (queryObject.uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
-                    console.log(`Request puzzle: ${queryObject.uuid}`);
-                    let startGetData = Date.now();
-                    await axiosRequest.get(`https://ubistatic-a.akamaihd.net/0098/captcha/generated/${queryObject.uuid}-PuzzleWithMissingPiece.rttex`, {
-                            headers: {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
-                            }
-                        })
-                        .then(async response => {
-                            let endGotData = Date.now();
-                            console.log(`Got puzzle: ${queryObject.uuid} in ${endGotData - startGetData}ms`);
-
-                            let buffer = Buffer.from(response.data, "binary");
-                            let rttex = new RTTEX(buffer);
-                            let solve = new PuzzleCaptchaSolver(rttex);
-                            
-                            let startSolving = Date.now();
-                            apiResponse = (solve.solve().x / rttex.rttexHeader.width).toString();
-
-                            let endSolving = Date.now();
-                            console.log(`Solved puzzle: ${queryObject.uuid} in ${endSolving - startSolving}ms`);
-                        })
-                        .catch(_ => {
-                            console.log(`Failed to get puzzle: ${queryObject.uuid}`);
-                        });
-                }
-            }
-        }
-
-        if (!req.url.includes("/api")) {
-            res.writeHead(200, { "Content-Type": "text/plain" });
-            res.write("Hello, world!");
-        }
-        else {
-            res.writeHead(200, { "Content-Type": "text/plain" });
-            res.write(apiResponse);
-        }
-
+    const end = (res, responseText) => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.write(responseText ? responseText : "Hello, world!");
         res.end();
+    }
+
+    http.createServer(async (req, res) => {
+        if (!req.url.startsWith("/api")) {
+            end(res);
+            return;
+        }
+
+        const queryObject = url.parse(req.url, true).query;
+        if (queryObject.type !== "puzzlecaptchasolver" || typeof queryObject.uuid !== "string") {
+            end(res, "failed");
+            return;
+        }
+
+        if (!queryObject.uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+            end(res, "failed");
+            return;
+        }
+
+        let apiResponse = "failed";
+
+        console.log(`Request puzzle: ${queryObject.uuid}`);
+        let startGetData = Date.now();
+        await axiosRequest.get(`https://ubistatic-a.akamaihd.net/0098/captcha/generated/${queryObject.uuid}-PuzzleWithMissingPiece.rttex`, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+                }
+            })
+            .then(async response => {
+                let endGotData = Date.now();
+                console.log(`Got puzzle: ${queryObject.uuid} in ${endGotData - startGetData}ms`);
+
+                let buffer = Buffer.from(response.data, "binary");
+                let rttex = new RTTEX(buffer);
+                let solve = new PuzzleCaptchaSolver(rttex);
+                
+                let startSolving = Date.now();
+                apiResponse = (solve.solve().x / rttex.rttexHeader.width).toString();
+
+                let endSolving = Date.now();
+                console.log(`Solved puzzle: ${queryObject.uuid} in ${endSolving - startSolving}ms`);
+            })
+            .catch(_ => {
+                console.log(`Failed to get puzzle: ${queryObject.uuid}`);
+            });
+        
+        end(res, apiResponse);
     }).listen(process.env.PORT || 3000);
 
     console.log(`Server running at http://localhost:${process.env.PORT || 3000}/`);
