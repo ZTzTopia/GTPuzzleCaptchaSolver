@@ -203,10 +203,6 @@ class PuzzleCaptchaSolver {
             let x = i % this.rttex.width;
             let y = Math.floor(i / this.rttex.width);
 
-            if (y > this.rttex.originalHeight / 1.218 || y < this.rttex.originalHeight * 0.218) {
-                continue;
-            }
-
             score = 0;
             for (let j = 0; j < this.check.length; j++) {
                 let address = ((y + this.check[j].y) * this.rttex.width) + (x + this.check[j].x);
