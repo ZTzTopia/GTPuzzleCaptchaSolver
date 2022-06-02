@@ -1,7 +1,6 @@
 const jimp = require("jimp");
 const http = require("http");
 const url = require("url");
-const fs = require("fs");
 const axios = require("axios").default;
 
 class RTFileHeader {
@@ -228,7 +227,7 @@ class PuzzleCaptchaSolver {
     }
 }
 
-async function main() {
+function main() {
     const axiosRequest = axios.create({
         responseType: "arraybuffer",
         baseURL: url,
@@ -251,7 +250,17 @@ async function main() {
         }
 
         const queryObject = url.parse(req.url, true).query;
-        if (queryObject.type !== "puzzlecaptchasolver" || typeof queryObject.uuid !== "string") {
+        if (typeof queryObject.type !== "string") {
+            end(res, "failed");
+            return;
+        }
+
+        if (queryObject.type !== "puzzlecaptchasolver") {
+            end(res, "failed");
+            return;
+        }
+
+        if (typeof queryObject.uuid !== "string") {
             end(res, "failed");
             return;
         }
@@ -267,7 +276,7 @@ async function main() {
         let startGetData = Date.now();
         await axiosRequest.get(`https://ubistatic-a.akamaihd.net/0098/captcha/generated/${queryObject.uuid}-PuzzleWithMissingPiece.rttex`, {
                 headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5097.0 Safari/537.36"
                 }
             })
             .then(async response => {
@@ -280,6 +289,7 @@ async function main() {
                 
                 let startSolving = Date.now();
                 apiResponse = (solve.solve().x / rttex.rttexHeader.width).toString();
+                console.log(`Puzzle answer: ${queryObject.uuid} position ${apiResponse}`);
 
                 let endSolving = Date.now();
                 console.log(`Solved puzzle: ${queryObject.uuid} in ${endSolving - startSolving}ms`);
