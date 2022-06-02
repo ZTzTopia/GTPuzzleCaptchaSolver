@@ -223,8 +223,6 @@ class PuzzleCaptchaSolver {
             }
 
             if (score > best.score) {
-                console.log(`${x},${y},${x / this.rttex.width}: ${score / this.check.length * 100}, ${this.check.length}`);
-
                 best.score = score;
                 best.x = x;
                 best.y = y;
