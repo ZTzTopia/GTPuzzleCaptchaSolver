@@ -110,7 +110,7 @@ class RTTEX {
         this.pos = this.rttexHeader.serialize(this.buffer, pos);
     }
 
-    rawData(flipVertical = false) {
+    async rawData(flipVertical = false) {
         if (this.rttexHeader.format != 5121) {
             return;
         }
@@ -121,12 +121,14 @@ class RTTEX {
             let mipData = this.buffer.subarray(this.pos, this.pos + mipHeader.dataSize);
 
             if (flipVertical) {
-                new jimp(mipHeader.width, mipHeader.height, (err, image) => {
-                    if (err) throw err;
-                    
-                    image.bitmap.data.set(mipData);
-                    image.flip(false, true);
-                    return image.bitmap.data;
+                return new Promise(resolve => {
+                    new jimp(mipHeader.width, mipHeader.height, (err, image) => {
+                        if (err) throw err;
+                        
+                        image.bitmap.data.set(mipData);
+                        image.flip(false, true);
+                        resolve(image.bitmap.data);
+                    });
                 });
             }
         
@@ -156,9 +158,17 @@ class PuzzleCaptchaSolver {
         ]
         
         this.rttex = rttex.rttexHeader;
-        this.pixels = rttex.rawData(true);
+        this.rttexData = rttex;
+        this.pixels;
         this.pixelsFiltered = new Uint8Array(this.rttex.height * this.rttex.width);
         this.filterDistance = 16;
+    }
+
+    async loadRawData() {
+        return new Promise(async (resolve, reject) => {
+            this.pixels = await this.rttexData.rawData(true);
+            resolve();
+        });
     }
 
     solve() {
@@ -184,7 +194,7 @@ class PuzzleCaptchaSolver {
             }
 
             if (this.pixels[address + 0] >= 200 && this.pixels[address + 1] >= 200 && this.pixels[address + 2] >= 200) {
-                if (this.pixels[address + 0] != 255 && this.pixels[address + 1] != 255 && this.pixels[address + 2] != 255) {
+                if (this.pixels[address + 0] !== 255 && this.pixels[address + 1] !== 255 && this.pixels[address + 2] !== 255) {
                     filter = 0;
                 }
             }
@@ -206,13 +216,15 @@ class PuzzleCaptchaSolver {
             score = 0;
             for (let j = 0; j < this.check.length; j++) {
                 let address = ((y + this.check[j].y) * this.rttex.width) + (x + this.check[j].x);
-                let expect = (this.check[j].expect == 255) ? 0 : 1;
-                if (this.pixelsFiltered[address] == expect) {
+                let expect = (this.check[j].expect === 255) ? 0 : 1;
+                if (this.pixelsFiltered[address] === expect) {
                     score++;
                 }
             }
 
-            if (score >= best.score) {
+            if (score > best.score) {
+                console.log(`${x},${y},${x / this.rttex.width}: ${score / this.check.length * 100}, ${this.check.length}`);
+
                 best.score = score;
                 best.x = x;
                 best.y = y;
@@ -223,7 +235,7 @@ class PuzzleCaptchaSolver {
     }
 }
 
-function main() {
+async function main() {
     const axiosRequest = axios.create({
         responseType: "arraybuffer",
         baseURL: url,
@@ -282,6 +294,8 @@ function main() {
                 let buffer = Buffer.from(response.data, "binary");
                 let rttex = new RTTEX(buffer);
                 let solve = new PuzzleCaptchaSolver(rttex);
+
+                await solve.loadRawData();
                 
                 let startSolving = Date.now();
                 apiResponse = (solve.solve().x / rttex.rttexHeader.width).toString();
