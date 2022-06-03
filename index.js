@@ -112,14 +112,17 @@ class RTTEX {
 
     async rawData(flipVertical = false) {
         if (this.rttexHeader.format != 5121) {
-            return;
+            return null;
         }
 
+        let posBefore = this.pos;
         for (let i = 0; i < this.rttexHeader.mipmapCount; i++) {
             let mipHeader = new RTTEXMipHeader();
             this.pos = mipHeader.serialize(this.buffer, this.pos);
             let mipData = this.buffer.subarray(this.pos, this.pos + mipHeader.dataSize);
 
+            this.pos = posBefore;
+            
             if (flipVertical) {
                 return new Promise(resolve => {
                     new jimp(mipHeader.width, mipHeader.height, (err, image) => {
@@ -138,16 +141,19 @@ class RTTEX {
         return null;
     }
 
-    write(path, flipVertical = true) {
-        new jimp(this.rttexHeader.width, this.rttexHeader.height, (err, image) => {
-            if (err) throw err;
-            
-            image.bitmap.data.set(this.rawData());
-            image.flip(false, flipVertical);
-            image.write(path);
-        });
+    async write(path, flipVertical = true) {
+        return new Promise(resolve => {
+            new jimp(this.rttexHeader.width, this.rttexHeader.height, (err, image) => {
+                if (err) throw err;
+                
+                image.bitmap.data.set(this.rawData());
+                image.flip(false, flipVertical);
+                image.write(path);
+                resolve(true);
+            });
 
-        return true;
+            resolve(false);
+        });
     }
 }
 
@@ -159,12 +165,12 @@ class PuzzleCaptchaSolver {
         
         this.rttex = rttex.rttexHeader;
         this.rttexData = rttex;
-        this.pixels;
+        this.pixels = null;
         this.pixelsFiltered = new Uint8Array(this.rttex.height * this.rttex.width);
         this.filterDistance = 16;
     }
 
-    async loadRawData() {
+    async loadAllPixel() {
         return new Promise(async (resolve, reject) => {
             this.pixels = await this.rttexData.rawData(true);
             resolve();
@@ -291,12 +297,12 @@ async function main() {
 
                 let buffer = Buffer.from(response.data, "binary");
                 let rttex = new RTTEX(buffer);
-                let solve = new PuzzleCaptchaSolver(rttex);
+                let puzzleCaptchaSolver = new PuzzleCaptchaSolver(rttex);
 
-                await solve.loadRawData();
+                await puzzleCaptchaSolver.loadAllPixel();
                 
                 let startSolving = Date.now();
-                apiResponse = (solve.solve().x / rttex.rttexHeader.width).toString();
+                apiResponse = (puzzleCaptchaSolver.solve().x / rttex.rttexHeader.width).toString();
                 console.log(`Puzzle answer: ${queryObject.uuid} position ${apiResponse}`);
 
                 let endSolving = Date.now();
