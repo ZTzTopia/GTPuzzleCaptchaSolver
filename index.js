@@ -214,8 +214,11 @@ class PuzzleCaptchaSolver {
                 filter = 0;
             }
 
-            if ((this.pixels[address] === 255 && this.pixels[address + 1] === 255 && this.pixels[address + 2] === 30) ||
-                (this.pixels[address] === 229 && this.pixels[address + 1] === 229 && this.pixels[address + 2] === 27)) {
+            // Detect yellow.
+            let r = this.pixels[address + 0] > 215;
+            let g = this.pixels[address + 1] == r || Math.abs(this.pixels[address + 1] - r) < 3;
+            let b = this.pixels[address + 2] >= 30 && this.pixels[address + 2] < 50;
+            if (r && g && b) {
                 if (filter === 1) {
                     this.yellowLineCount++;
                     filter = 2;
