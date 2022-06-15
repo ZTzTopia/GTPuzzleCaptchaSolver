@@ -216,7 +216,7 @@ class PuzzleCaptchaSolver {
 
             // Detect yellow.
             let r = this.pixels[address + 0] > 215;
-            let g = this.pixels[address + 1] === r || Math.abs(this.pixels[address + 1] - r) < 3;
+            let g = Math.abs(this.pixels[address + 1] - this.pixels[address + 0]) < 3;
             let b = this.pixels[address + 2] >= 30 && this.pixels[address + 2] < 50;
             if (r && g && b) {
                 if (filter === 1) {
